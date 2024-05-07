@@ -18,10 +18,10 @@ bf_error_rate = 0.001
 batch_size = 100000
 
 
-def split_files(input_dir, n_proc):
+def split_files(input_dir, n_proc):# 将文件分为n份，存到list中
     files = os.listdir(input_dir)
     files = sorted(files)
-    file_paths = [os.path.join(input_dir, file) for file in files]
+    file_paths = [os.path.join(input_dir, file) for file in files]# 建立一个文件列表
     parts =  divide(n_proc, file_paths)
     return [list(p) for p in parts]
 
@@ -34,7 +34,7 @@ def get_text(files, doc_queue):
                         json_doc = json.loads(line)
                     except:
                         continue
-                    doc_queue.put((json_doc, line))
+                    doc_queue.put((json_doc, line))# 将解析后的json对象和原始行数据一起放入队列中
             except Exception as e:
                 continue
 
@@ -49,10 +49,10 @@ def full_text_dedup():
     files = split_files(input_dir, read_worker_num)
 
     processes = []
-    for process_id in range(read_worker_num):
-        p = multiprocessing.Process(
-            target=get_text,
-            args=(files[process_id], doc_queue,),
+    for process_id in range(read_worker_num):# 第n个的进程
+        p = multiprocessing.Process( # 创建了一个新的进程
+            target=get_text,# target参数指定了这个进程执行的函数
+            args=(files[process_id], doc_queue,),# 传输给target的参数
         )
         processes.append(p)
         p.start()
@@ -65,23 +65,23 @@ def full_text_dedup():
             json_doc, line = doc_queue.get(timeout=30)
             text = json_doc[CONTENT_FIELD_NAME]
             flag = bf.add(text)
-            if not flag:
+            if not flag:# 如果文本不存在于过滤器中，则将该文本添加到过滤器中，并将文档添加到批次write_batch中
                 print("add one doc")
                 write_batch.append(line)
                 # print(f"write batch num is {len(write_batch)}")
-                if len(write_batch) >= batch_size:
+                if len(write_batch) >= batch_size:# # 当write_batch达到一定大小时，将写入批次中的文档写入到文件中
                     file_name = f"part_{part_id}.jsonl"
                     part_id += 1
                     print(f"begin to write bacth {file_name}")
                     file_path = os.path.join(output_dir, file_name)
                     pool.apply_async(write_json_file, (file_path, write_batch,))
                     write_batch = []
-            else:
+            else:# 如果文本已经存在过滤器中，则跳过该文档，过滤
                 print(f"filter one doc")
                 pass
-        except queue.Empty:
+        except queue.Empty:# 队列为空时，退出循环
             break
-    if len(write_batch) > 0:
+    if len(write_batch) > 0:# 如果还有剩余的文档未处理，将剩余文档写入文件中
         file_name = f"part_{part_id}"
         part_id += 1
         print(f"begin to write bacth {file_name}")
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     parser.add_argument('--queue_size', type=int, default=queue_size, help='specify the buffer size between read and write process')
     parser.add_argument('--read_worker_num', type=int, default=read_worker_num, help='specify the number of read worker')
     parser.add_argument('--write_worker_num', type=int, default=write_worker_num, help='specify the number of write worker')
-    parser.add_argument('--bf_init_capacity', type=int, default=bf_init_capacity, help='specify the initial capacity of bloom filter')
+    parser.add_argument('--bf_init_capacity', type=int, default=bf_init_capacity, help='specify the initial capacity of bloom filter')# bloom过滤器的初始容量
     parser.add_argument('--bf_error_rate', type=float, default=bf_error_rate, help='specify the error rate of bloom filter')
     parser.add_argument('--batch_size', type=int, default=batch_size, help='specify the number of lines of output jonsl files')
     parser.add_argument('--content_filed_name', type=str, default=CONTENT_FIELD_NAME, help='specify the field name of content in jsonl file')
